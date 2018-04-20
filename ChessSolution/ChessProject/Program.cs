@@ -6,7 +6,11 @@ namespace ChessProject
 	{
 		public static void Main (string[] args)
 		{
-			Console.WriteLine ("Hello World!");
+			var p = Position.Zero.Inverted ().Inverted ();
+			p.Invert ();
+			p.Invert ();
+			Visualizer.DrawPosition (p);
 		}
+
 	}
 }
