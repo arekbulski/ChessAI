@@ -21,7 +21,7 @@ namespace ChessProject
 		/// Possible optimisation: use 16-bit shorts for rooks and bishops.
 
 		public ulong WhitePawnsList;
-		public ulong WhiteKnigthsList;
+		public ulong WhiteKnightsList;
 		public ulong WhiteBishopsList;
 		public ulong WhiteRooksList;
 		public ulong WhiteQueensList;
@@ -58,6 +58,11 @@ namespace ChessProject
 
 		public Position ()
 		{
+		}
+
+		public Position Copy ()
+		{
+			return (Position)this.MemberwiseClone ();
 		}
 
 		static Position ()
@@ -337,7 +342,7 @@ namespace ChessProject
 		public void Invert ()
 		{
 			InvertListBitmap (this.WhitePawnsList, out this.WhitePawnsList, out this.WhitePawns);
-			InvertListBitmap (this.WhiteKnigthsList, out this.WhiteKnigthsList, out this.WhiteKnights);
+			InvertListBitmap (this.WhiteKnightsList, out this.WhiteKnightsList, out this.WhiteKnights);
 			InvertListBitmap (this.WhiteBishopsList, out this.WhiteBishopsList, out this.WhiteBishops);
 			InvertListBitmap (this.WhiteRooksList, out this.WhiteRooksList, out this.WhiteRooks);
 			InvertListBitmap (this.WhiteQueensList, out this.WhiteQueensList, out this.WhiteQueens);
@@ -365,7 +370,7 @@ namespace ChessProject
 			Position r = new Position ();
 
 			InvertListBitmap (this.WhitePawnsList, out r.WhitePawnsList, out r.WhitePawns);
-			InvertListBitmap (this.WhiteKnigthsList, out r.WhiteKnigthsList, out r.WhiteKnights);
+			InvertListBitmap (this.WhiteKnightsList, out r.WhiteKnightsList, out r.WhiteKnights);
 			InvertListBitmap (this.WhiteBishopsList, out r.WhiteBishopsList, out r.WhiteBishops);
 			InvertListBitmap (this.WhiteRooksList, out r.WhiteRooksList, out r.WhiteRooks);
 			InvertListBitmap (this.WhiteQueensList, out r.WhiteQueensList, out r.WhiteQueens);
@@ -426,14 +431,14 @@ namespace ChessProject
 			Position r = new Position ();
 
 			r.WhitePawnsList = MakeList (8, 9, 10, 11, 12, 13, 14, 15);
-			r.WhiteKnigthsList = MakeList (1, 6);
+			r.WhiteKnightsList = MakeList (1, 6);
 			r.WhiteBishopsList = MakeList (2, 5);
 			r.WhiteRooksList = MakeList (0, 7);
 			r.WhiteQueensList = MakeList (3);
 			r.WhiteKingLocation = 4;
 
 			r.WhitePawns = MakeBitmap (r.WhitePawnsList);
-			r.WhiteKnights = MakeBitmap (r.WhiteKnigthsList);
+			r.WhiteKnights = MakeBitmap (r.WhiteKnightsList);
 			r.WhiteBishops = MakeBitmap (r.WhiteBishopsList);
 			r.WhiteRooks = MakeBitmap (r.WhiteRooksList);
 			r.WhiteQueens = MakeBitmap (r.WhiteQueensList);
@@ -488,26 +493,57 @@ namespace ChessProject
 			return r;
 		}
 
+		public static readonly byte[][] KnightsAttacks = GetKnightsAttacks ();
+
+		public static byte[][] GetKnightsAttacks ()
+		{
+			byte[][] r = new byte[64][];
+			for (int L = 0; L < 64; L++) {
+				int R = L / 8;
+				int C = L % 8;
+
+				var x = new List<byte> ();
+				if (R < 6 && C > 0)
+					x.Add ((byte)MakeLocation (R + 2, C - 1));
+				if (R < 6 && C < 7)
+					x.Add ((byte)MakeLocation (R + 2, C + 1));
+				if (R < 7 && C > 1)
+					x.Add ((byte)MakeLocation (R + 1, C - 2));
+				if (R < 7 && C < 6)
+					x.Add ((byte)MakeLocation (R + 1, C + 2));
+				if (R > 0 && C > 1)
+					x.Add ((byte)MakeLocation (R - 1, C - 2));
+				if (R > 0 && C < 6)
+					x.Add ((byte)MakeLocation (R - 1, C + 2));
+				if (R > 1 && C > 0)
+					x.Add ((byte)MakeLocation (R - 2, C - 1));
+				if (R > 1 && C < 7)
+					x.Add ((byte)MakeLocation (R - 2, C + 1));
+				r [L] = x.ToArray ();
+			}
+			return r;
+		}
+
 		public Position[] GenerateAllLegalMoves ()
 		{
 			var generated = new List<Position> ();
 
 			foreach (int L in IterateList(this.WhitePawnsList)) {
-				int mL = L + 8;
 				ulong B = 1UL << L;
+				int mL = L + 8;
 				ulong mB = B << 8;
 
 				/// one move ahead
 				if ((mB & this.Occupied) == 0) {
 					if (L < 48) {
 						/// normal move
-						Position p = (Position)this.MemberwiseClone ();
+						Position p = this.Copy ();
 						p.MovePawn (L, mL, B, mB);
 						p.PostMove ();
 						generated.Add (p);
 					} else {
 						/// promotion, move to last row
-						Position p = (Position)this.MemberwiseClone ();
+						Position p = this.Copy ();
 						p.MovePawnPromoteQueen (L, mL, B, mB);
 						p.PostMove ();
 						generated.Add (p);
@@ -516,10 +552,10 @@ namespace ChessProject
 					/// en passant double move
 					/// Optimisation: already checked if mid square is not occupied.
 					mL = L + 16;
+					mB = B << 16;
 					if (L < 16) {
-						mB = B << 16;
 						if ((mB & this.Occupied) == 0) {
-							Position p = (Position)this.MemberwiseClone ();
+							Position p = this.Copy ();
 							p.MovePawnEnPassant (L, mL, B, mB);
 							p.PostMove ();
 							generated.Add (p);
@@ -530,7 +566,7 @@ namespace ChessProject
 					mL = L + 7;
 					mB = B << 7;
 					if ((mB & this.BlackOccupied) != 0) {
-						Position p = (Position)this.MemberwiseClone ();
+						Position p = this.Copy ();
 						p.MovePawn (L, mL, B, mB);
 						p.Capture (mL, mB);
 						p.PostMove ();
@@ -540,9 +576,31 @@ namespace ChessProject
 					mL = L + 9;
 					mB = B << 9;
 					if ((mB & this.BlackOccupied) != 0) {
-						Position p = (Position)this.MemberwiseClone ();
+						Position p = this.Copy ();
 						p.MovePawn (L, mL, B, mB);
 						p.Capture (mL, mB);
+						p.PostMove ();
+						generated.Add (p);
+					}
+				}
+			}
+
+			foreach (int L in IterateList(this.WhiteKnightsList)) {
+				ulong B = 1UL << L;
+				foreach (var mL in KnightsAttacks[L]) {
+					ulong mB = 1UL << mL;
+
+					if ((mB & this.BlackOccupied) != 0) {
+						/// capture
+						Position p = this.Copy ();
+						p.MoveKnight (L, mL, B, mB);
+						p.Capture (mL, mB);
+						p.PostMove ();
+						generated.Add (p);
+					} else if ((mB & this.Occupied) == 0) {
+						/// move
+						Position p = this.Copy ();
+						p.MoveKnight (L, mL, B, mB);
 						p.PostMove ();
 						generated.Add (p);
 					}
@@ -583,6 +641,14 @@ namespace ChessProject
 		public void MovePawnPromoteKnight (int L, int mL, ulong B, ulong mB)
 		{
 			throw new NotImplementedException ();
+		}
+
+		public void MoveKnight (int L, int mL, ulong B, ulong mB)
+		{
+			this.WhiteKnightsList = ListAdd (ListRemove (this.WhiteKnightsList, L), mL);
+			this.WhiteKnights ^= B ^ mB;
+			this.WhiteOccupied ^= B ^ mB;
+			this.Occupied ^= B ^ mB;
 		}
 
 		public void Capture (int L, ulong B)
@@ -669,6 +735,23 @@ namespace ChessProject
 					rlist = (rlist << 7) | L;
 					rbitmap |= 1UL << (int)L;
 				}
+				/// Optimisation: lists are guaranteed to have a sentinel.
+				list >>= 7;
+			}
+		}
+
+		public static void ListReplaceBitmap (ulong list, int removeL, int appendL, out ulong rlist, out ulong rbitmap)
+		{
+			rlist = 64;
+			rbitmap = 0;
+			/// Optimisation: when arrived at a sentinel, its equal 64, before that its greater than 64.
+			while (list > 64) {
+				ulong L = list & 63;
+				if (L == (ulong)removeL) {
+					L = (ulong)appendL;
+				}
+				rlist = (rlist << 7) | L;
+				rbitmap |= 1UL << (int)L;
 				/// Optimisation: lists are guaranteed to have a sentinel.
 				list >>= 7;
 			}
