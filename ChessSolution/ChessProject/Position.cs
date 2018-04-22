@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 
 namespace ChessProject
 {
@@ -487,27 +488,75 @@ namespace ChessProject
 			return r;
 		}
 
-		public static Position[] GenerateAllLegalMoves (Position p)
+		public Position[] GenerateAllLegalMoves ()
+		{
+			var generated = new List<Position> ();
+
+			foreach (int L in IterateList(this.WhitePawnsList)) {
+				int mL = L + 8;
+				ulong B = 1UL << L;
+				ulong mB = B << 8;
+
+				/// one move ahead
+				if ((mB & this.Occupied) == 0) {
+					if (L < 48) {
+						/// normal move
+						Position p = (Position)this.MemberwiseClone ();
+						p.MovePawn (L, mL, B, mB);
+						generated.Add (p);
+					} else {
+						/// promotion, move to last row
+						Position p = (Position)this.MemberwiseClone ();
+						p.PromoteQueen (L, mL, B, mB);
+						generated.Add (p);
+					}
+
+					if (L < 16) {
+						/// en passant double move
+						/// Optimisation: already checked if mid square is not occupied.
+						int mL2 = L + 16;
+						ulong mB2 = B << 16;
+						if ((mB2 & this.Occupied) == 0) {
+							Position p = (Position)this.MemberwiseClone ();
+							p.MovePawnEnPassant (L, mL2, B, mB2);
+							generated.Add (p);
+						}
+					}
+				}
+			}
+
+
+			return generated.ToArray ();
+
+//			throw new NotImplementedException ();
+		}
+
+		public void MovePawn (int L, int mL, ulong B, ulong mB)
+		{
+			this.WhitePawnsList = ListRemove (this.WhitePawnsList, L);
+			this.WhitePawns = this.WhitePawns ^ B ^ mB;
+
+			ListRemoveBitmap(this.WhitePawnsList, L, out this.WhitePawnsList, out this.WhitePawns);
+
+			throw new NotImplementedException ();
+		}
+
+		public void MovePawnEnPassant (int L, int mL, ulong B, ulong mB)
 		{
 			throw new NotImplementedException ();
 		}
 
-		public void MovePawn (Position p, int L, int mL)
+		public void PostMove ()
 		{
 			throw new NotImplementedException ();
 		}
 
-		public void PostMove (Position p)
+		public void Capture (int L, int mL)
 		{
 			throw new NotImplementedException ();
 		}
 
-		public void Capture (Position p, int L, int mL)
-		{
-			throw new NotImplementedException ();
-		}
-
-		public void PromoteQueen (Position p, int L, int mL)
+		public void PromoteQueen (int L, int mL, ulong B, ulong mB)
 		{
 			/// Possible issue: list can hold only 8 locations, if player attempts to gain 9th queen or 10th horse
 			/// then give him the other piece (horse or queen).
@@ -519,6 +568,14 @@ namespace ChessProject
 			throw new NotImplementedException ();
 		}
 
+		public static IEnumerable<int> IterateList (ulong list)
+		{
+			while (list > 64) {
+				yield return (int)(list & 63);
+				list >>= 7;
+			}
+		}
+
 		public static ulong ListAdd (ulong list, ulong L)
 		{
 			/// Optimisation: assumes list+1 is within capacity of 8.
@@ -526,7 +583,7 @@ namespace ChessProject
 			return (list << 7) | L;
 		}
 
-		public static ulong ListRemove (ulong list, ulong L)
+		public static ulong ListRemove (ulong list, int L)
 		{
 			/// Possible optimisation: list is guaranteed to contain L, no checking for sentinel.
 			/// Possible optimisation: upon finding L, remaining half-list is merged without chopping.
@@ -535,35 +592,32 @@ namespace ChessProject
 //			for i in range(0,64-7-7,7):
 //				print("else if (((list >> {}) & 63) == L)".format(i))
 //				print("    return (list & {}) | ((list >> {}) << {});".format((1<<i)-1, i+7, i))
-//
-//			if ((list & 63) == L)
-//				return list >> 7;
-//			else if (((list >> 7) & 63) == L)
-//				return (list & 127) | ((list >> 14) << 7);
-//			else if (((list >> 14) & 63) == L)
-//				return (list & 16383) | ((list >> 21) << 14);
-//			else if (((list >> 21) & 63) == L)
-//				return (list & 2097151) | ((list >> 28) << 21);
-//			else if (((list >> 28) & 63) == L)
-//				return (list & 268435455) | ((list >> 35) << 28);
-//			else if (((list >> 35) & 63) == L)
-//				return (list & 34359738367) | ((list >> 42) << 35);
-//			else if (((list >> 42) & 63) == L)
-//				return (list & 4398046511103) | ((list >> 49) << 42);
-//			else if (((list >> 49) & 63) == L)
-//				return (list & 562949953421311) | ((list >> 56) << 49);
-//			else
-//				return list;
 
 			ulong r = 64;
 			while (list > 64) {
 				ulong x = list & 63;
-				if (x != L) {
+				if (x != (ulong)L) {
 					r = (r << 7) | x;
 				}
 				list >>= 7;
 			}
 			return r;
+		}
+
+		public static void ListRemoveBitmap (ulong list, int removeL, out ulong rlist, out ulong rbitmap)
+		{
+			rlist = 64;
+			rbitmap = 0;
+			/// Optimisation: when arrived at a sentinel, its equal 64, before that its greater than 64.
+			while (list > 64) {
+				ulong L = list & 63;
+				if ((int)L != removeL) {
+					rlist = (rlist << 7) | L;
+					rbitmap |= 1UL << (int)L;
+				}
+				/// Optimisation: lists are guaranteed to have a sentinel.
+				list >>= 7;
+			}
 		}
 
 	}
