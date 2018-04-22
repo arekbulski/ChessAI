@@ -612,7 +612,7 @@ namespace ChessProject
 
 		public void MovePawn (int L, int mL, ulong B, ulong mB)
 		{
-			this.WhitePawnsList = ListAdd (ListRemove (this.WhitePawnsList, L), mL);
+			this.WhitePawnsList = ListReplace (this.WhitePawnsList, L, mL);
 			this.WhitePawns ^= B ^ mB;
 			this.WhiteOccupied ^= B ^ mB;
 			this.Occupied ^= B ^ mB;
@@ -620,7 +620,7 @@ namespace ChessProject
 
 		public void MovePawnEnPassant (int L, int mL, ulong B, ulong mB)
 		{
-			this.WhitePawnsList = ListAdd (ListRemove (this.WhitePawnsList, L), mL);
+			this.WhitePawnsList = ListReplace (this.WhitePawnsList, L, mL);
 			this.WhitePawns = this.WhitePawns ^ B ^ mB;
 			this.WhiteOccupied ^= B ^ mB;
 			this.Occupied ^= B ^ mB;
@@ -645,7 +645,7 @@ namespace ChessProject
 
 		public void MoveKnight (int L, int mL, ulong B, ulong mB)
 		{
-			this.WhiteKnightsList = ListAdd (ListRemove (this.WhiteKnightsList, L), mL);
+			this.WhiteKnightsList = ListReplace (this.WhiteKnightsList, L, mL);
 			this.WhiteKnights ^= B ^ mB;
 			this.WhiteOccupied ^= B ^ mB;
 			this.Occupied ^= B ^ mB;
@@ -719,6 +719,20 @@ namespace ChessProject
 				if (x != (ulong)L) {
 					r = (r << 7) | x;
 				}
+				list >>= 7;
+			}
+			return r;
+		}
+
+		public static ulong ListReplace (ulong list, int removeL, int appendL)
+		{
+			ulong r = 64;
+			while (list > 64) {
+				ulong L = list & 63;
+				if (L == (ulong)removeL) {
+					L = (ulong)appendL;
+				}
+				r = (r << 7) | L;
 				list >>= 7;
 			}
 			return r;
