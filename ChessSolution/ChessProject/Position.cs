@@ -34,7 +34,7 @@ namespace ChessProject
 		public ulong WhiteQueens;
 
 		public ulong BlackPawnsList;
-		public ulong BlackKnigthsList;
+		public ulong BlackKnightsList;
 		public ulong BlackBishopsList;
 		public ulong BlackRooksList;
 		public ulong BlackQueensList;
@@ -344,7 +344,7 @@ namespace ChessProject
 			this.WhiteKingLocation = (byte)(63 - this.WhiteKingLocation);
 
 			InvertListBitmap (this.BlackPawnsList, out this.BlackPawnsList, out this.BlackPawns);
-			InvertListBitmap (this.BlackKnigthsList, out this.BlackKnigthsList, out this.BlackKnights);
+			InvertListBitmap (this.BlackKnightsList, out this.BlackKnightsList, out this.BlackKnights);
 			InvertListBitmap (this.BlackBishopsList, out this.BlackBishopsList, out this.BlackBishops);
 			InvertListBitmap (this.BlackRooksList, out this.BlackRooksList, out this.BlackRooks);
 			InvertListBitmap (this.BlackQueensList, out this.BlackQueensList, out this.BlackQueens);
@@ -372,7 +372,7 @@ namespace ChessProject
 			r.WhiteKingLocation = (byte)(63 - this.WhiteKingLocation);
 
 			InvertListBitmap (this.BlackPawnsList, out r.BlackPawnsList, out r.BlackPawns);
-			InvertListBitmap (this.BlackKnigthsList, out r.BlackKnigthsList, out r.BlackKnights);
+			InvertListBitmap (this.BlackKnightsList, out r.BlackKnightsList, out r.BlackKnights);
 			InvertListBitmap (this.BlackBishopsList, out r.BlackBishopsList, out r.BlackBishops);
 			InvertListBitmap (this.BlackRooksList, out r.BlackRooksList, out r.BlackRooks);
 			InvertListBitmap (this.BlackQueensList, out r.BlackQueensList, out r.BlackQueens);
@@ -439,14 +439,14 @@ namespace ChessProject
 			r.WhiteQueens = MakeBitmap (r.WhiteQueensList);
 
 			r.BlackPawnsList = MakeList (48, 49, 50, 51, 52, 53, 54, 55);
-			r.BlackKnigthsList = MakeList (57, 62);
+			r.BlackKnightsList = MakeList (57, 62);
 			r.BlackBishopsList = MakeList (58, 61);
 			r.BlackRooksList = MakeList (56, 63);
 			r.BlackQueensList = MakeList (59);
 			r.BlackKingLocation = 60;
 
 			r.BlackPawns = MakeBitmap (r.BlackPawnsList);
-			r.BlackKnights = MakeBitmap (r.BlackKnigthsList);
+			r.BlackKnights = MakeBitmap (r.BlackKnightsList);
 			r.BlackBishops = MakeBitmap (r.BlackBishopsList);
 			r.BlackRooks = MakeBitmap (r.BlackRooksList);
 			r.BlackQueens = MakeBitmap (r.BlackQueensList);
@@ -503,69 +503,123 @@ namespace ChessProject
 						/// normal move
 						Position p = (Position)this.MemberwiseClone ();
 						p.MovePawn (L, mL, B, mB);
+						p.PostMove ();
 						generated.Add (p);
 					} else {
 						/// promotion, move to last row
 						Position p = (Position)this.MemberwiseClone ();
-						p.PromoteQueen (L, mL, B, mB);
+						p.MovePawnPromoteQueen (L, mL, B, mB);
+						p.PostMove ();
 						generated.Add (p);
 					}
 
+					/// en passant double move
+					/// Optimisation: already checked if mid square is not occupied.
+					mL = L + 16;
 					if (L < 16) {
-						/// en passant double move
-						/// Optimisation: already checked if mid square is not occupied.
-						int mL2 = L + 16;
-						ulong mB2 = B << 16;
-						if ((mB2 & this.Occupied) == 0) {
+						mB = B << 16;
+						if ((mB & this.Occupied) == 0) {
 							Position p = (Position)this.MemberwiseClone ();
-							p.MovePawnEnPassant (L, mL2, B, mB2);
+							p.MovePawnEnPassant (L, mL, B, mB);
+							p.PostMove ();
 							generated.Add (p);
 						}
+					}
+
+					/// capture left-ahead
+					mL = L + 7;
+					mB = B << 7;
+					if ((mB & this.BlackOccupied) != 0) {
+						Position p = (Position)this.MemberwiseClone ();
+						p.MovePawn (L, mL, B, mB);
+						p.Capture (mL, mB);
+						p.PostMove ();
+						generated.Add (p);
+					}
+					/// capture right-ahead
+					mL = L + 9;
+					mB = B << 9;
+					if ((mB & this.BlackOccupied) != 0) {
+						Position p = (Position)this.MemberwiseClone ();
+						p.MovePawn (L, mL, B, mB);
+						p.Capture (mL, mB);
+						p.PostMove ();
+						generated.Add (p);
 					}
 				}
 			}
 
-
 			return generated.ToArray ();
-
-//			throw new NotImplementedException ();
 		}
 
 		public void MovePawn (int L, int mL, ulong B, ulong mB)
 		{
-			this.WhitePawnsList = ListRemove (this.WhitePawnsList, L);
-			this.WhitePawns = this.WhitePawns ^ B ^ mB;
-
-			ListRemoveBitmap(this.WhitePawnsList, L, out this.WhitePawnsList, out this.WhitePawns);
-
-			throw new NotImplementedException ();
+			this.WhitePawnsList = ListAdd (ListRemove (this.WhitePawnsList, L), mL);
+			this.WhitePawns ^= B ^ mB;
+			this.WhiteOccupied ^= B ^ mB;
+			this.Occupied ^= B ^ mB;
 		}
 
 		public void MovePawnEnPassant (int L, int mL, ulong B, ulong mB)
 		{
+			this.WhitePawnsList = ListAdd (ListRemove (this.WhitePawnsList, L), mL);
+			this.WhitePawns = this.WhitePawns ^ B ^ mB;
+			this.WhiteOccupied ^= B ^ mB;
+			this.Occupied ^= B ^ mB;
+		}
+
+		public void MovePawnPromoteQueen (int L, int mL, ulong B, ulong mB)
+		{
+			/// Possible issue: list can hold only 8 locations, if player attempts to gain 9th queen or 10th horse
+			/// then give him the other piece (horse or queen).
+			this.WhitePawnsList = ListRemove (this.WhitePawnsList, L);
+			this.WhitePawns ^= B;
+			this.WhiteQueensList = ListAdd (this.WhiteQueensList, mL);
+			this.WhiteQueens ^= mB;
+			this.WhiteOccupied ^= B ^ mB;
+			this.Occupied ^= B ^ mB;
+		}
+
+		public void MovePawnPromoteKnight (int L, int mL, ulong B, ulong mB)
+		{
 			throw new NotImplementedException ();
+		}
+
+		public void Capture (int L, ulong B)
+		{
+			if ((B & this.BlackPawns) != 0) {
+				this.BlackPawnsList = ListRemove (this.BlackPawnsList, L);
+				this.BlackPawns ^= B;
+				this.BlackOccupied ^= B;
+				this.Occupied ^= B;
+			} else if ((B & this.BlackKnights) != 0) {
+				this.BlackKnightsList = ListRemove (this.BlackKnightsList, L);
+				this.BlackKnights ^= B;
+				this.BlackOccupied ^= B;
+				this.Occupied ^= B;
+			} else if ((B & this.BlackBishops) != 0) {
+				this.BlackBishopsList = ListRemove (this.BlackBishopsList, L);
+				this.BlackBishops ^= B;
+				this.BlackOccupied ^= B;
+				this.Occupied ^= B;
+			} else if ((B & this.BlackRooks) != 0) {
+				this.BlackRooksList = ListRemove (this.BlackRooksList, L);
+				this.BlackRooks ^= B;
+				this.BlackOccupied ^= B;
+				this.Occupied ^= B;
+			} else if ((B & this.BlackQueens) != 0) {
+				this.BlackQueensList = ListRemove (this.BlackQueensList, L);
+				this.BlackQueens ^= B;
+				this.BlackOccupied ^= B;
+				this.Occupied ^= B;
+			} else
+				throw new ArgumentException ("Capture: selected square contains a king or nothing");
 		}
 
 		public void PostMove ()
 		{
-			throw new NotImplementedException ();
-		}
-
-		public void Capture (int L, int mL)
-		{
-			throw new NotImplementedException ();
-		}
-
-		public void PromoteQueen (int L, int mL, ulong B, ulong mB)
-		{
-			/// Possible issue: list can hold only 8 locations, if player attempts to gain 9th queen or 10th horse
-			/// then give him the other piece (horse or queen).
-			throw new NotImplementedException ();
-		}
-
-		public void PromoteKnight (Position p, int L, int mL)
-		{
-			throw new NotImplementedException ();
+			this.WhiteInCheck = this.GetWhiteInCheck ();
+			this.BlackInCheck = this.GetBlackInCheck ();
 		}
 
 		public static IEnumerable<int> IterateList (ulong list)
@@ -576,11 +630,11 @@ namespace ChessProject
 			}
 		}
 
-		public static ulong ListAdd (ulong list, ulong L)
+		public static ulong ListAdd (ulong list, int L)
 		{
 			/// Optimisation: assumes list+1 is within capacity of 8.
 			/// Possible issue: list is pre-appended like a stack, not queue.
-			return (list << 7) | L;
+			return (list << 7) | (ulong)L;
 		}
 
 		public static ulong ListRemove (ulong list, int L)
